@@ -1,0 +1,87 @@
+自定义函数：
+根据用户自定义函数类别分为以下三种：
+	（1）UDF（User-Defined-Function）
+		一进一出
+	（2）UDAF（User-Defined Aggregation Function）
+		聚集函数，多进一出
+		类似于：count/max/min
+	（3）UDTF（User-Defined Table-Generating Functions）
+		一进多出
+		如lateral view explore()
+
+编程步骤：
+	（1）继承org.apache.hadoop.hive.ql.UDF
+	（2）需要实现evaluate函数；evaluate函数支持重载；
+	（3）在hive的命令行窗口创建函数
+		a）添加jar
+			add jar linux_jar_path
+		b）创建function，
+			create [temporary] function [dbname.]function_name AS class_name;
+	（4）在hive的命令行窗口删除函数
+		Drop [temporary] function [if exists] [dbname.]function_name;
+
+Hive支持的存储数的格式主要有：TEXTFILE 、SEQUENCEFILE、ORC、PARQUET。
+TEXTFILE和SEQUENCEFILE的存储格式都是基于行存储的；
+ORC和PARQUET是基于列式存储的。
+
+创建一个snappy压缩的orc存储方式
+create table log_orc_snappy(
+track_time string,
+url string,
+session_id string,
+referer string,
+ip string,
+end_user_id string,
+city_id string
+)
+row format delimited fields terminated by '\t'
+stored as orc tblproperties ("orc.compress"="SNAPPY");
+
+行列转换：
+2.2.1、行转列
+表结构：
+name	constellation	blood_type
+孙悟空	白羊座	A
+大海	射手座	A
+宋宋	白羊座	B
+猪八戒	白羊座	A
+凤姐	射手座	A
+创建表及数据导入：
+create table person_info(
+name string,
+constellation string,
+blood_type string)
+row format delimited fields terminated by "\t";
+load data local inpath “person_info.tsv” into table person_info;
+例如：把星座和血型一样的人归类到一起
+select
+    t1.base,
+    concat_ws('|', collect_set(t1.name)) name
+from
+    (select
+        name,
+        concat(constellation, ",", blood_type) base
+    from
+        person_info) t1
+group by
+    t1.base;
+
+2.2.2、列转行
+表结构：
+movie	category
+《疑犯追踪》	悬疑,动作,科幻,剧情
+《Lie to me》	悬疑,警匪,动作,心理,剧情
+《战狼2》	战争,动作,灾难
+创建表及导入数据：
+create table movie_info(
+    movie string,
+    category array<string>)
+row format delimited fields terminated by "\t"
+collection items terminated by ",";
+load data local inpath "movie_info.tsv" into table movie_info;
+例如：将电影分类中的数组数据展开
+select
+    movie,
+    category_name
+from
+    movie_info lateral view explode(category) table_tmp as category_name;

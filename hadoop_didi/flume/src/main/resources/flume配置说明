@@ -1,0 +1,82 @@
+5. 配置Flume（准实时采集mysql数据库数据到hdfs）
+        在Ambari -> Flume -> Configs -> flume.conf中配置如下属性：
+agent.channels.ch1.type = memory
+agent.sources.sql-source.channels = ch1
+agent.channels = ch1
+agent.sinks = HDFS
+
+agent.sources = sql-source
+agent.sources.sql-source.type = org.keedio.flume.source.SQLSource
+
+agent.sources.sql-source.connection.url = jdbc:mysql://172.16.1.127:3306/test
+agent.sources.sql-source.user = root
+agent.sources.sql-source.password = 123456
+agent.sources.sql-source.table = wlslog
+agent.sources.sql-source.columns.to.select = *
+
+agent.sources.sql-source.incremental.column.name = id
+agent.sources.sql-source.incremental.value = 0
+
+agent.sources.sql-source.run.query.delay=5000
+
+agent.sources.sql-source.status.file.path = /var/lib/flume
+agent.sources.sql-source.status.file.name = sql-source.status
+
+agent.sinks.HDFS.channel = ch1
+agent.sinks.HDFS.type = hdfs
+agent.sinks.HDFS.hdfs.path = hdfs://mycluster/flume/mysql
+agent.sinks.HDFS.hdfs.fileType = DataStream
+agent.sinks.HDFS.hdfs.writeFormat = Text
+agent.sinks.HDFS.hdfs.rollSize = 268435456
+agent.sinks.HDFS.hdfs.rollInterval = 0
+agent.sinks.HDFS.hdfs.rollCount = 0
+        Flume在flume.conf文件中指定Source、Channel和Sink相关的配置，各属性描述如表1所示。
+属性                                              描述
+
+agent.channels.ch1.type                     Agent的channel类型
+
+agent.sources.sql-source.channels           Source对应的channel名称
+
+agent.channels                              Channel名称
+
+agent.sinks                                 Sink名称
+
+agent.sources                               Source名称
+
+agent.sources.sql-source.type               Source类型
+
+agent.sources.sql-source.connection.url     数据库URL
+
+agent.sources.sql-source.user               数据库用户名
+
+agent.sources.sql-source.password           数据库密码
+
+agent.sources.sql-source.table              数据库表名
+
+agent.sources.sql-source.columns.to.select  查询的列
+
+agent.sources.sql-source.incremental.column.name    增量列名
+
+agent.sources.sql-source.incremental.value  增量初始值
+
+agent.sources.sql-source.run.query.delay    发起查询的时间间隔，单位是毫秒
+
+agent.sources.sql-source.status.file.path   状态文件路径
+
+agent.sources.sql-source.status.file.name   状态文件名称
+
+agent.sinks.HDFS.channel                    Sink对应的channel名称
+
+agent.sinks.HDFS.type                       Sink类型
+
+agent.sinks.HDFS.hdfs.path                  Sink路径
+
+agent.sinks.HDFS.hdfs.fileType              流数据的文件类型
+
+agent.sinks.HDFS.hdfs.writeFormat           数据写入格式
+
+agent.sinks.HDFS.hdfs.rollSize              目标文件轮转大小，单位是字节
+
+agent.sinks.HDFS.hdfs.rollInterval          hdfs sink间隔多长将临时文件滚动成最终目标文件，单位是秒；如果设置成0，则表示不根据时间来滚动文件
+
+agent.sinks.HDFS.hdfs.rollCount             当events数据达到该数量时候，将临时文件滚动成目标文件；如果设置成0，则表示不根据events数据来滚动文件

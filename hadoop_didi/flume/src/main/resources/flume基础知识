@@ -1,0 +1,15 @@
+一.Flume角色
+1、Source
+用于采集数据，Source 是产生数据流的地方，同时 Source 会将产生的数据流传输到 Channel，
+这个有点类似于 Java IO 部分的 Channel。
+2、Channel
+用于桥接 Sources 和 Sinks，类似于一个队列。
+3、Sink
+从 Channel 收集数据，将数据写到目标源(可以是下一个 Source，也可以是 HDFS 或者 HBase)。
+4、Event
+传输单元，Flume 数据传输的基本单元，以事件的形式将数据从源头送至目的地。
+
+flume传输过程：
+source 监控某个文件或数据流，数据源产生新的数据，拿到该数据后，将数据封装在一个
+Event 中，并 put 到 channel 后 commit 提交，channel 队列先进先出，sink 去 channel 队列中
+拉取数据，然后写入到 HDFS 中

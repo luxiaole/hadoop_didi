@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ExternalStorageConfigurationManager" enabled="true" />
+  <component name="MavenProjectsManager">
+    <option name="originalFiles">
+      <list>
+        <option value="$PROJECT_DIR$/pom.xml" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" project-jdk-name="1.8" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/out" />
+  </component>
+  <component name="libraryTable">
+    <library name="jdk1">
+      <CLASSES />
+      <JAVADOC />
+      <SOURCES>
+        <root url="file://D:/develop/jdk1.8" />
+      </SOURCES>
+      <jarDirectory url="file://D:/develop/jdk1.8" recursive="false" type="SOURCES" />
+    </library>
+    <library name="scala-intellij-bin-2018.2.11">
+      <CLASSES>
+        <root url="jar://D:/scala-intellij-bin-2018.2.11.zip!/" />
+      </CLASSES>
+      <JAVADOC />
+      <SOURCES>
+        <root url="jar://D:/scala-intellij-bin-2018.2.11.zip!/" />
+      </SOURCES>
+      <jarDirectory url="jar://D:/scala-intellij-bin-2018.2.11.zip!/" recursive="false" />
+    </library>
+  </component>
+</project>

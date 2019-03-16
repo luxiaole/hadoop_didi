@@ -1,0 +1,193 @@
+一.RDBMS到HDFS
+（1）全部导入
+$ bin/sqoop import \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--table staff \
+--target-dir /user/company \
+--delete-target-dir \
+--num-mappers 1 \
+--fields-terminated-by "\t"
+
+（2）查询导入:--query选项，不能同时与--table选项使用
+$ bin/sqoop import \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--target-dir /user/company \
+--delete-target-dir \
+--num-mappers 1 \
+--fields-terminated-by "\t" \
+--query 'select name,sex from staff where id <=1 and $CONDITIONS;'
+
+（3）导入指定列:columns中如果涉及到多列，用逗号分隔，分隔时不要添加空格
+$ bin/sqoop import \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--target-dir /user/company \
+--delete-target-dir \
+--num-mappers 1 \
+--fields-terminated-by "\t" \
+--columns id,sex \
+--table staff
+
+（4）使用sqoop关键字筛选查询导入数据
+$ bin/sqoop import \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--target-dir /user/company \
+--delete-target-dir \
+--num-mappers 1 \
+--fields-terminated-by "\t" \
+--table staff \
+--where "id=1"
+
+
+
+一.将mysql数据库数据导入到hive
+将关系型数据库中的数据导入到HDFS（包括Hive，HBase）中，
+如果导入的是Hive，那么当Hive中没有对应表时，则自动创建。
+//1.全表导入
+
+sqoop import-all-tables  \
+--connect "jdbc:mysql://119.23.151.103:3306/bank" \
+ --username=didiphp  \
+ --password=DotDeeMy365com  \
+ --hive-import  \
+ --hive-overwrite  \
+ --hive-database bank   \
+ --num-mappers 1
+
+ //2.导入指定的表到对应的hive数据库
+
+   sqoop import \
+ --connect "jdbc:mysql://119.23.151.103:3306/crawl" \
+  --username=didiphp  \
+  --password=DotDeeMy365com  \
+   --table dd_music_list \
+   -m 1 \
+   --hive-import \
+   --hive-database crawl
+
+$ bin/sqoop import \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--table staff \
+--num-mappers 1 \
+--hive-import \
+--fields-terminated-by "\t" \
+--hive-overwrite \
+--hive-table staff_hive
+尖叫提示：该过程分为两步，第一步将数据导入到HDFS，第二步将导入到HDFS的数据迁移到Hive仓库
+尖叫提示：第一步默认的临时目录是/user/admin/表名
+
+hive增量导入：
+$ bin/sqoop import \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--table staff \
+--num-mappers 1 \
+--fields-terminated-by "\t" \
+--target-dir /user/hive/warehouse/staff_hive \
+--check-column id \
+--incremental append \
+--last-value 3
+
+$ bin/sqoop import \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--table staff_timestamp \
+--check-column last_modified \
+--incremental lastmodified \
+--last-value "2017-09-28 22:20:38" \
+--m 1 \
+--append
+使用lastmodified方式导入数据要指定增量数据是要--append（追加）还是要--merge-key（合并）
+last-value指定的值是会包含于增量导入的数据中
+
+
+导出数据
+在Sqoop中，“导出”概念指：从大数据集群（HDFS，HIVE，HBASE）向非大数据集群（RDBMS）中传输数据，叫做：导出，即使用export关键字。
+4.2.1、HIVE/HDFS到RDBMS
+$ bin/sqoop export \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--table staff \
+--num-mappers 1 \
+--export-dir /user/hive/warehouse/staff_hive \
+--input-fields-terminated-by "\t"
+尖叫提示：Mysql中如果表不存在，不会自动创建
+思考：数据是覆盖还是追加
+
+将关系型数据库中的表映射为一个Java类，在该类中有各列对应的各个字段。
+$ bin/sqoop codegen \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--table staff \
+--bindir /home/admin/Desktop/staff \
+--class-name Staff \
+--fields-terminated-by "\t"
+
+create-hive-table
+生成与关系数据库表结构对应的hive表结构。
+命令：
+如：
+$ bin/sqoop create-hive-table \
+--connect jdbc:mysql://linux01:3306/company \
+--username root \
+--password 123456 \
+--table staff \
+--hive-table hive_staff
+
+
+用来生成一个sqoop任务，生成后不会立即执行，需要手动执行。
+命令：
+如：
+$ bin/sqoop job \
+ --create myjob -- import-all-tables \
+ --connect jdbc:mysql://linux01:3306/company \
+ --username root \
+ --password 123456
+$ bin/sqoop job \
+--list
+$ bin/sqoop job \
+--exec myjob
+尖叫提示：注意import-all-tables和它左边的--之间有一个空格
+尖叫提示：如果需要连接metastore，则--meta-connect jdbc:hsqldb:hsql://linux01:16000/sqoop
+
+sqoop脚本打包
+1) 创建一个.opt文件
+$ mkdir opt
+$ touch opt/job_HDFS2RDBMS.opt
+
+2) 编写sqoop脚本
+$ vi opt/job_HDFS2RDBMS.opt
+
+export
+--connect
+jdbc:mysql://linux01:3306/company
+--username
+root
+--password
+123456
+--table
+staff
+--num-mappers
+1
+--export-dir
+/user/hive/warehouse/staff_hive
+--input-fields-terminated-by
+"\t"
+3) 执行该脚本
+$ bin/sqoop --options-file opt/job_HDFS2RDBMS.opt
+
+
+

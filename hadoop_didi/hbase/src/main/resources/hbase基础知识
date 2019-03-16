@@ -1,0 +1,36 @@
+HBase的角色
+1、HMaster
+功能：
+1) 监控RegionServer
+2) 处理RegionServer故障转移
+3) 处理元数据的变更
+4) 处理region的分配或移除
+5) 在空闲时间进行数据的负载均衡
+6) 通过Zookeeper发布自己的位置给客户端
+2、RegionServer
+功能：
+1) 负责存储HBase的实际数据
+2) 处理分配给它的Region
+3) 刷新缓存到HDFS
+4) 维护HLog
+5) 执行压缩
+6) 负责处理Region分片
+组件：
+1) Write-Ahead logs
+HBase的修改记录，当对HBase读写数据的时候，数据不是直接写进磁盘，它会在内存中保留一段时间
+（时间以及数据量阈值可以设定）。但把数据保存在内存中可能有更高的概率引起数据丢失，为了解
+决这个问题，数据会先写在一个叫做Write-Ahead logfile的文件中，然后再写入内存中。所以在系
+统出现故障的时候，数据可以通过这个日志文件重建。
+2) HFile
+这是在磁盘上保存原始数据的实际的物理文件，是实际的存储文件。
+3) Store
+HFile存储在Store中，一个Store对应HBase表中的一个列族。
+4) MemStore
+顾名思义，就是内存存储，位于内存中，用来保存当前的数据操作，所以当数据保存在WAL中之后，
+RegsionServer会在内存中存储键值对。
+5) Region
+Hbase表的分片，HBase表会根据RowKey值被切分成不同的region存储在RegionServer中，在一个
+RegionServer中可以有多个不同的region。
+
+一个RegionServer可以包含多个HRegion，每个RegionServer维护一个HLog，和多个HFiles以及其
+对应的MemStore。RegionServer运行于DataNode上，数量可以与DatNode数量一致

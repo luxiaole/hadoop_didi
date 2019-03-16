@@ -1,0 +1,130 @@
+mr优点
+1）MapReduce 易于编程。
+2）良好的扩展性。当你的计算资源不能得到满足的时候，你可以通过简单的增加机器来扩展它的计算能力。
+3）高容错性。MapReduce设计的初衷就是使程序能够部署在廉价的PC机器上，这就要求它具有很高的容错性。
+比如其中一台机器挂了，它可以把上面的计算任务转移到另外一个节点上运行，不至于这个任务运行失败，
+而且这个过程不需要人工参与，而完全是由 Hadoop内部完成的。
+4）适合PB级以上海量数据的离线处理。这里加红字体离线处理，说明它适合离线处理而不适合在线处理。
+比如像毫秒级别的返回一个结果，MapReduce很难做到。
+
+MapReduce编程规范
+用户编写的程序分成三个部分：Mapper，Reducer，Driver(提交运行mr程序的客户端)
+1）Mapper阶段
+	（1）用户自定义的Mapper要继承自己的父类
+	（2）Mapper的输入数据是KV对的形式（KV的类型可自定义）
+	（3）Mapper中的业务逻辑写在map()方法中
+	（4）Mapper的输出数据是KV对的形式（KV的类型可自定义）
+	（5）map()方法（maptask进程）对每一个<K,V>调用一次
+2）Reducer阶段
+	（1）用户自定义的Reducer要继承自己的父类
+	（2）Reducer的输入数据类型对应Mapper的输出数据类型，也是KV
+	（3）Reducer的业务逻辑写在reduce()方法中
+	（4）Reducetask进程对每一组相同k的<k,v>组调用一次reduce()方法
+3）Driver阶段
+整个程序需要一个Drvier来进行提交，提交的是一个描述了各种必要信息的job对象
+
+MapTask工作机制
+（1）Read阶段：Map Task通过用户编写的RecordReader，从输入InputSplit中解析出一个个key/value。
+（2）Map阶段：该节点主要是将解析出的key/value交给用户编写map()函数处理，并产生一系列新的key/value。
+（3）Collect收集阶段：在用户编写map()函数中，当数据处理完成后，一般会调用OutputCollector.collect()
+	输出结果。在该函数内部，它会将生成的key/value分区（调用Partitioner），并写入一个环形内存缓冲区中。
+（4）Spill阶段：即“溢写”，当环形缓冲区满后，MapReduce会将数据写到本地磁盘上，生成一个临时文件。需要
+	注意的是，将数据写入本地磁盘之前，先要对数据进行一次本地排序，并在必要时对数据进行合并、压缩等操作。
+	溢写阶段详情：
+	步骤1：利用快速排序算法对缓存区内的数据进行排序，排序方式是，先按照分区编号partition进行排序，然后按
+	照key进行排序。这样，经过排序后，数据以分区为单位聚集在一起，且同一分区内所有数据按照key有序。
+	步骤2：按照分区编号由小到大依次将每个分区中的数据写入任务工作目录下的临时文件output/spillN.out（N表
+	示当前溢写次数）中。如果用户设置了Combiner，则写入文件之前，对每个分区中的数据进行一次聚集操作。
+	步骤3：将分区数据的元信息写到内存索引数据结构SpillRecord中，其中每个分区的元信息包括在临时文件中的
+	偏移量、压缩前数据大小和压缩后数据大小。如果当前内存索引大小超过1MB，则将内存索引写到文件output/
+	spillN.out.index中。
+（5）Combine阶段：当所有数据处理完成后，MapTask对所有临时文件进行一次合并，以确保最终只会生成一个
+	数据文件。
+	当所有数据处理完后，MapTask会将所有临时文件合并成一个大文件，并保存到文件output/file.out中，同时
+	生成相应的索引文件output/file.out.index。
+	在进行文件合并过程中，MapTask以分区为单位进行合并。对于某个分区，它将采用多轮递归合并的方式。每轮
+	合并io.sort.factor（默认100）个文件，并将产生的文件重新加入待合并列表中，对文件排序后，重复以上
+	过程，直到最终得到一个大文件。
+	让每个MapTask最终只生成一个数据文件，可避免同时打开大量文件和同时读取大量小文件产生的随机读取带来
+	的开销。
+
+ReduceTask工作机制
+（1）Copy阶段：ReduceTask从各个MapTask上远程拷贝一片数据，并针对某一片数据，如果其大小超过一定阈值，
+则写到磁盘上，否则直接放到内存中。
+（2）Merge阶段：在远程拷贝数据的同时，ReduceTask启动了两个后台线程对内存和磁盘上的文件进行合并，以
+防止内存使用过多或磁盘上文件过多。
+（3）Sort阶段：按照MapReduce语义，用户编写reduce()函数输入数据是按key进行聚集的一组数据。为了将key
+相同的数据聚在一起，Hadoop采用了基于排序的策略。由于各个MapTask已经实现对自己的处理结果进行了局部排
+序，因此，ReduceTask只需对所有数据进行一次归并排序即可。
+（4）Reduce阶段：reduce()函数将计算结果写到HDFS上。
+
+
+企业优化
+Mapreduce 程序效率的瓶颈在于两点：
+1）计算机性能
+	CPU、内存、磁盘健康、网络
+2）I/O 操作优化
+（1）数据倾斜
+（2）map和reduce数设置不合理
+（3）map运行时间太长，导致reduce等待过久
+（4）小文件过多
+（5）大量的不可分块的超大文件
+（6）spill次数过多
+（7）merge次数过多等
+
+MapReduce优化方法：
+MapReduce优化方法主要从六个方面考虑：数据输入、Map阶段、Reduce阶段、IO传输、数据倾斜问题和常用的调优参数。
+数据输入
+（1）合并小文件：在执行mr任务前将小文件进行合并，大量的小文件会产生大量的map任务，增大map任务装载次数，
+而任务的装载比较耗时，从而导致mr运行较慢。
+（2）采用CombineTextInputFormat来作为输入，解决输入端大量小文件场景。
+Map阶段
+1）减少溢写（spill）次数：通过调整io.sort.mb及sort.spill.percent参数值，增大触发spill的内存上限，减少
+spill次数，从而减少磁盘IO。
+2）减少合并（merge）次数：通过调整io.sort.factor参数，增大merge的文件数目，减少merge的次数，从而缩短
+mr处理时间。
+3）在map之后，不影响业务逻辑前提下，先进行combine处理，减少 I/O。
+Reduce阶段
+1）合理设置map和reduce数：两个都不能设置太少，也不能设置太多。太少，会导致task等待，延长处理时间；太多，
+会导致 map、reduce任务间竞争资源，造成处理超时等错误。
+2）设置map、reduce共存：调整slowstart.completedmaps参数，使map运行到一定程度后，reduce也开始运行，减
+少reduce的等待时间。
+3）规避使用reduce：因为reduce在用于连接数据集的时候将会产生大量的网络消耗。
+4）合理设置reduce端的buffer：默认情况下，数据达到一个阈值的时候，buffer中的数据就会写入磁盘，然后reduce
+会从磁盘中获得所有的数据。也就是说，buffer和reduce是没有直接关联的，中间多个一个写磁盘->读磁盘的过程，
+既然有这个弊端，那么就可以通过参数来配置，使得buffer中的一部分数据可以直接输送到reduce，从而减少IO开销：
+mapred.job.reduce.input.buffer.percent，默认为0.0。当值大于0的时候，会保留指定比例的内存读buffer中的
+数据直接拿给reduce使用。这样一来，设置buffer需要内存，读取数据需要内存，reduce计算也要内存，所以要根据
+作业的运行情况进行调整。
+IO传输
+1）采用数据压缩的方式，减少网络IO的的时间。安装Snappy和LZO压缩编码器。
+2）使用SequenceFile二进制文件。
+数据倾斜问题
+方法1：抽样和范围分区
+可以通过对原始数据进行抽样得到的结果集来预设分区边界值。
+方法2：自定义分区
+基于输出键的背景知识进行自定义分区。例如，如果map输出键的单词来源于一本书。且其中某几个专业词汇较多。那
+么就可以自定义分区将这这些专业词汇发送给固定的一部分reduce实例。而将其他的都发送给剩余的reduce实例。
+方法3：Combine
+使用Combine可以大量地减小数据倾斜。在可能的情况下，combine的目的就是聚合并精简数据。
+方法4：采用Map Join，尽量避免Reduce Join。
+常用的调优参数
+资源相关参数
+（1）以下参数是在用户自己的mr应用程序中配置就可以生效（mapred-default.xml）
+（2）应该在yarn启动之前就配置在服务器的配置文件中才能生效（yarn-default.xml）
+（3）shuffle性能优化的关键参数，应在yarn启动之前就配置好（mapred-default.xml）
+容错相关参数(mapreduce性能优化)
+大量小文件优化
+1）Hadoop Archive:
+ 是一个高效地将小文件放入HDFS块中的文件存档工具，它能够将多个小文件打包成一个HAR文件，这样就减少了
+namenode的内存使用。
+2）Sequence file：
+ sequence file由一系列的二进制key/value组成，如果key为文件名，value为文件内容，则可以将大批小文件
+合并成一个大文件。
+3）CombineFileInputFormat：
+  CombineFileInputFormat是一种新的inputformat，用于将多个文件合并成一个单独的split，另外，它会考
+虑数据的存储位置。
+4）开启JVM重用
+对于大量小文件Job，可以开启JVM重用会减少45%运行时间。
+JVM重用理解：一个map运行一个jvm，重用的话，在一个map在jvm上运行完毕后，jvm继续运行其他map。
+具体设置：mapreduce.job.jvm.numtasks值在10-20之间。
